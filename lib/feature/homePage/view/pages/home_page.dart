@@ -43,6 +43,15 @@ class _HomePageState extends State<HomePage> {
   final TextEditingController destinationTextController =
       TextEditingController();
 
+  double calculateFare(double km, String vehicleType) {
+    double carRate = 10.0; // ₹10 per km
+    double bikeRate = 5.0; // ₹5 per km
+
+    return vehicleType == "car" ? km * carRate : km * bikeRate;
+  }
+
+  final double distance = 5;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -80,15 +89,62 @@ class _HomePageState extends State<HomePage> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: Colors.black,
-        foregroundColor: Colors.white,
-        onPressed:
-            () => _googleMapController!.animateCamera(
-              CameraUpdate.newCameraPosition(_cameraPosition),
-            ),
-        child: const Icon(Icons.center_focus_strong),
-      ),
+
+      floatingActionButton:
+          (destinationTextController.text.isNotEmpty &&
+                  intialTextController.text.isNotEmpty)
+              ? null
+              : FloatingActionButton(
+                backgroundColor: Colors.black,
+                foregroundColor: Colors.white,
+                onPressed:
+                    () => _googleMapController!.animateCamera(
+                      CameraUpdate.newCameraPosition(_cameraPosition),
+                    ),
+                child: const Icon(Icons.center_focus_strong),
+              ),
+      bottomNavigationBar:
+          (destinationTextController.text.isNotEmpty &&
+                  intialTextController.text.isNotEmpty)
+              ? Container(
+                height: 150,
+                color: Colors.white38,
+                child: Column(
+                  children: [
+                    Text("Total Distance: $distance km"),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        Image(
+                          image: AssetImage("assets/icons/car.png"),
+                          height: 50,
+                        ),
+                        Text("Car Fare: ₹${calculateFare(distance, "car")}"),
+                        TextButton(
+                          onPressed: () {},
+                          child: Text("Ride with Car"),
+                        ),
+                      ],
+                    ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        Image(
+                          image: AssetImage("assets/icons/motorcycle.png"),
+                          height: 50,
+                        ),
+
+                        Text("Bike Fare: ₹${calculateFare(distance, "bike")}"),
+                        TextButton(
+                          onPressed: () {},
+                          child: Text("Ride with Bike"),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              )
+              : const SizedBox.shrink(),
     );
   }
 }
