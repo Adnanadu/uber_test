@@ -1,50 +1,74 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:uber_app/feature/homePage/view/widgets/customized_text_field.dart';
+import 'package:uber_app/feature/homePage/model/google_map_model.dart';
+import 'package:uber_app/feature/provider/google_map_service_provider.dart';
+import '../widgets/customized_text_field.dart';
 
-class HomePage extends StatefulWidget {
+class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
 
   @override
-  State<HomePage> createState() => _HomePageState();
+  ConsumerState<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
-  /// The controller for the Google Map.
+class _HomePageState extends ConsumerState<HomePage> {
   GoogleMapController? _googleMapController;
+  Marker? origin;
+  Marker? destination;
+  final TextEditingController fromController = TextEditingController();
+  final TextEditingController toController = TextEditingController();
+
+  List<String> fromSuggestions = [];
+  List<String> toSuggestions = [];
+
+  static const CameraPosition _initialCameraPosition = CameraPosition(
+    target: LatLng(11.441197, 75.694731),
+    zoom: 14.5,
+  );
 
   @override
   void dispose() {
-    _googleMapController!.dispose();
+    _googleMapController?.dispose();
     super.dispose();
   }
 
-  ///intial location of the map when the app is opened
-  void initialLocation() {
-    _googleMapController!.animateCamera(
-      CameraUpdate.newCameraPosition(_initialCameraPosition),
-    );
+  /// Fetch place predictions when user types
+  void fetchPredictions(String input, bool isFrom) async {
+    if (input.isEmpty) {
+      setState(() {
+        isFrom ? fromSuggestions.clear() : toSuggestions.clear();
+      });
+      return;
+    }
+
+    final predictions = await ref.read(placePredictionsProvider(input).future);
+    setState(() {
+      if (isFrom) {
+        fromSuggestions = predictions.map((e) => e.description).toList();
+      } else {
+        toSuggestions = predictions.map((e) => e.description).toList();
+      }
+    });
   }
 
-  /// The initial camera position for the map.
-  static const CameraPosition _initialCameraPosition = CameraPosition(
-    target: LatLng(11.441197, 75.694731),
-    zoom: 14.4746,
-  );
+  /// Set marker when user selects a prediction
+  void setLocation(String location, bool isFrom) {
+    if (isFrom) {
+      fromController.text = location;
+      fromSuggestions.clear();
+    } else {
+      toController.text = location;
+      toSuggestions.clear();
+    }
 
-  /// The position of the map "camera" in the real world.
-  static const CameraPosition _cameraPosition = CameraPosition(
-    bearing: 192.8334901395799,
-    target: LatLng(11.441197, 75.694731),
-    tilt: 59.440717697143555,
-    zoom: 14.151926040649414,
-  );
-  Marker? origin;
-  Marker? destination;
+    ref.invalidate(directionsProvider);
+  }
 
+  /// Add marker to the map
   void addMarker(LatLng pos) {
-    if ((destination != null)) {
-      setState(() {
+    setState(() {
+      if (destination != null) {
         origin = Marker(
           markerId: const MarkerId("origin"),
           infoWindow: const InfoWindow(title: "Origin"),
@@ -54,131 +78,131 @@ class _HomePageState extends State<HomePage> {
           position: pos,
         );
         destination = null;
-      });
-    } else {
-      setState(() {
+      } else {
         destination = Marker(
           markerId: const MarkerId("destination"),
           infoWindow: const InfoWindow(title: "Destination"),
           icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
           position: pos,
         );
-      });
+      }
+    });
+
+    if (origin != null && destination != null) {
+      ref.invalidate(directionsProvider);
     }
   }
 
-  /// Text controllers for the initial location and destination location.
-
-  final TextEditingController intialTextController = TextEditingController();
-  final TextEditingController destinationTextController =
-      TextEditingController();
-
-  double calculateFare(double km, String vehicleType) {
-    double carRate = 10.0; // ₹10 per km
-    double bikeRate = 5.0; // ₹5 per km
-
-    return vehicleType == "car" ? km * carRate : km * bikeRate;
-  }
-
-  final double distance = 5;
-
   @override
   Widget build(BuildContext context) {
+    final directionState = ref.watch(
+      directionsProvider(
+        LatLngPair(
+          origin: origin?.position ?? const LatLng(0, 0),
+          destination: destination?.position ?? const LatLng(0, 0),
+        ),
+      ),
+    );
+
     return Scaffold(
       body: Stack(
         children: [
-          /// Google Map
           GoogleMap(
-            markers: const <Marker>{},
+            markers: {
+              if (origin != null) origin!,
+              if (destination != null) destination!,
+            },
             onLongPress: addMarker,
             myLocationButtonEnabled: false,
             zoomControlsEnabled: false,
             initialCameraPosition: _initialCameraPosition,
-            onMapCreated:
-                (GoogleMapController controller) =>
-                    _googleMapController = controller,
+            onMapCreated: (controller) => _googleMapController = controller,
           ),
-
-          /// intial location and destination location text fields
           SafeArea(
             child: Column(
               children: [
                 CustomizedTextField(
-                  text: 'search here',
-                  controller: intialTextController,
-                  padding: const EdgeInsets.only(
-                    left: 16.0,
-                    right: 16.0,
-                    top: 16.0,
-                    bottom: 8,
-                  ),
+                  text: 'Search starting location',
+                  controller: fromController,
+                  padding: const EdgeInsets.all(16.0),
+                  onChanged: (input) => fetchPredictions(input, true),
+                  onSuggestionSelected:
+                      (selection) => setLocation(selection, true),
+                  suggestions: fromSuggestions,
                 ),
                 CustomizedTextField(
-                  text: 'choose destination',
-                  controller: destinationTextController,
+                  text: 'Choose destination',
+                  controller: toController,
                   padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  onChanged: (input) => fetchPredictions(input, false),
+                  onSuggestionSelected:
+                      (selection) => setLocation(selection, false),
+                  suggestions: toSuggestions,
                 ),
               ],
             ),
           ),
         ],
       ),
+      bottomNavigationBar: _buildBottomNavigationBar(directionState),
+    );
+  }
 
-      floatingActionButton:
-          (destinationTextController.text.isNotEmpty &&
-                  intialTextController.text.isNotEmpty)
-              ? null
-              : FloatingActionButton(
-                backgroundColor: Colors.black,
-                foregroundColor: Colors.white,
-                onPressed:
-                    () => _googleMapController!.animateCamera(
-                      CameraUpdate.newCameraPosition(_cameraPosition),
-                    ),
-                child: const Icon(Icons.center_focus_strong),
-              ),
-      bottomNavigationBar:
-          (destinationTextController.text.isNotEmpty &&
-                  intialTextController.text.isNotEmpty)
-              ? Container(
-                height: 150,
-                color: Colors.white38,
-                child: Column(
-                  children: [
-                    Text("Total Distance: $distance km"),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        Image(
-                          image: AssetImage("assets/icons/car.png"),
-                          height: 50,
-                        ),
-                        Text("Car Fare: ₹${calculateFare(distance, "car")}"),
-                        TextButton(
-                          onPressed: () {},
-                          child: Text("Ride with Car"),
-                        ),
-                      ],
-                    ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        Image(
-                          image: AssetImage("assets/icons/motorcycle.png"),
-                          height: 50,
-                        ),
+  Widget _buildBottomNavigationBar(AsyncValue<RouteInfo> directionState) {
+    return directionState.when(
+      data:
+          (data) =>
+              data.distance.value == 0
+                  ? _buildErrorContainer(
+                    "No route found! Please select valid locations.",
+                  )
+                  : _buildFareInfo(data.distance.text),
+      loading: () => _buildLoadingContainer(),
+      error: (err, _) => _buildErrorContainer("Error: $err"),
+    );
+  }
 
-                        Text("Bike Fare: ₹${calculateFare(distance, "bike")}"),
-                        TextButton(
-                          onPressed: () {},
-                          child: Text("Ride with Bike"),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              )
-              : null,
+  Widget _buildFareInfo(String distance) {
+    double km = double.tryParse(distance.replaceAll(" km", "")) ?? 0;
+    return Container(
+      height: 150,
+      color: Colors.white38,
+      child: Column(
+        children: [
+          Text("Total Distance: $distance"),
+          _buildFareRow("Car", "assets/icons/car.png", km * 10),
+          _buildFareRow("Bike", "assets/icons/motorcycle.png", km * 5),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFareRow(String vehicle, String assetPath, double fare) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: [
+        Image(image: AssetImage(assetPath), height: 50),
+        Text("$vehicle Fare: ₹$fare"),
+        TextButton(onPressed: () {}, child: Text("Ride with $vehicle")),
+      ],
+    );
+  }
+
+  Widget _buildErrorContainer(String message) {
+    return Container(
+      height: 60,
+      color: Colors.redAccent,
+      child: Center(
+        child: Text(message, style: const TextStyle(color: Colors.white)),
+      ),
+    );
+  }
+
+  Widget _buildLoadingContainer() {
+    return Container(
+      height: 60,
+      color: Colors.white,
+      child: const Center(child: Text("Loading route... ⏳")),
     );
   }
 }
