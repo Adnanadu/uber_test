@@ -6,8 +6,8 @@ class CustomizedTextField extends StatelessWidget {
   final TextEditingController controller;
   final EdgeInsetsGeometry padding;
   final Function(String) onChanged;
-  final Function(Prediction) onSuggestionSelected; // ✅ Accepts `Prediction`
-  final List<Prediction> suggestions; // ✅ Stores `Prediction` objects
+  final Function(Prediction) onSuggestionSelected;
+  final List<Prediction> suggestions;
 
   const CustomizedTextField({
     super.key,
@@ -38,21 +38,21 @@ class CustomizedTextField extends StatelessWidget {
           if (suggestions.isNotEmpty)
             Container(
               color: Colors.white,
-              child: Column(
-                children:
-                    suggestions
-                        .map(
-                          (prediction) => ListTile(
-                            title: Text(
-                              prediction.description,
-                            ), // ✅ Show place name
-                            onTap:
-                                () => onSuggestionSelected(
-                                  prediction,
-                                ), // ✅ Ensure correct type
-                          ),
-                        )
-                        .toList(),
+              child: Material(
+                // Wrap with Material
+                elevation: 4.0, // Add elevation for shadow
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: suggestions.length,
+                  itemBuilder: (context, index) {
+                    final prediction = suggestions[index];
+                    return ListTile(
+                      title: Text(prediction.description),
+                      onTap: () => onSuggestionSelected(prediction),
+                    );
+                  },
+                ),
               ),
             ),
         ],

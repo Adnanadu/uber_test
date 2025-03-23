@@ -1,26 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:uber_app/feature/homePage/model/google_map_model.dart';
 import 'package:uber_app/feature/provider/google_map_service_provider.dart';
 import '../widgets/customized_text_field.dart';
 
-class HomePage extends ConsumerStatefulWidget {
+class HomePage extends HookConsumerWidget {
   const HomePage({super.key});
-
-  @override
-  ConsumerState<HomePage> createState() => _HomePageState();
-}
-
-class _HomePageState extends ConsumerState<HomePage> {
-  GoogleMapController? _googleMapController;
-  Marker? origin;
-  Marker? destination;
-  final TextEditingController fromController = TextEditingController();
-  final TextEditingController toController = TextEditingController();
-
-  List<Prediction> fromSuggestions = [];
-  List<Prediction> toSuggestions = [];
 
   static const CameraPosition _initialCameraPosition = CameraPosition(
     target: LatLng(11.441197, 75.694731),
@@ -28,47 +15,49 @@ class _HomePageState extends ConsumerState<HomePage> {
   );
 
   @override
-  void dispose() {
-    _googleMapController?.dispose();
-    super.dispose();
-  }
+  Widget build(BuildContext context, WidgetRef ref) {
+    final googleMapController = useState<GoogleMapController?>(null);
+    final fromController = useTextEditingController();
+    final toController = useTextEditingController();
+    final fromSuggestions = useState<List<Prediction>>([]);
+    final toSuggestions = useState<List<Prediction>>([]);
+    final originMarker = useState<Marker?>(null);
+    final destinationMarker = useState<Marker?>(null);
 
-  /// Fetch place predictions when user types
-  void fetchPredictions(String input, bool isFrom) async {
-    if (input.isEmpty) {
-      setState(() {
-        isFrom ? fromSuggestions = [] : toSuggestions = [];
-      });
-      return;
-    }
-
-    final predictions = await ref.read(placePredictionsProvider(input).future);
-    setState(() {
-      if (isFrom) {
-        fromSuggestions = predictions;
-      } else {
-        toSuggestions = predictions;
+    /// Fetch predictions when user types in the text fields
+    void fetchPredictions(String input, bool isFrom) async {
+      if (input.isEmpty) {
+        if (isFrom) {
+          fromSuggestions.value = [];
+        } else {
+          toSuggestions.value = [];
+        }
+        return;
       }
-    });
-  }
-
-  /// Set marker when user selects a prediction
-  void setLocation(Prediction prediction, bool isFrom) async {
-    if (isFrom) {
-      fromController.text = prediction.description;
-      fromSuggestions.clear();
-    } else {
-      toController.text = prediction.description;
-      toSuggestions.clear();
+      final predictions = await ref.read(
+        placePredictionsProvider(input).future,
+      );
+      if (isFrom) {
+        fromSuggestions.value = predictions;
+      } else {
+        toSuggestions.value = predictions;
+      }
     }
 
-    final placeLatLng = await ref.read(
-      placeLatLngProvider(prediction.placeId).future,
-    );
-
-    setState(() {
+    /// Set location when a suggestion is selected
+    void setLocation(Prediction prediction, bool isFrom) async {
       if (isFrom) {
-        origin = Marker(
+        fromController.text = prediction.description;
+        fromSuggestions.value = [];
+      } else {
+        toController.text = prediction.description;
+        toSuggestions.value = [];
+      }
+      final placeLatLng = await ref.read(
+        placeLatLngProvider(prediction.placeId).future,
+      );
+      if (isFrom) {
+        originMarker.value = Marker(
           markerId: const MarkerId("origin"),
           position: placeLatLng,
           infoWindow: const InfoWindow(title: "Pickup Location"),
@@ -77,31 +66,27 @@ class _HomePageState extends ConsumerState<HomePage> {
           ),
         );
       } else {
-        destination = Marker(
+        destinationMarker.value = Marker(
           markerId: const MarkerId("destination"),
           position: placeLatLng,
           infoWindow: const InfoWindow(title: "Destination"),
           icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
         );
       }
-    });
-
-    _googleMapController?.animateCamera(
-      CameraUpdate.newLatLngZoom(placeLatLng, 14),
-    );
-
-    if (origin != null && destination != null) {
-      ref.invalidate(directionsProvider);
+      googleMapController.value?.animateCamera(
+        CameraUpdate.newLatLngZoom(placeLatLng, 14),
+      );
+      // Invalidate directions when both locations are set
+      if (originMarker.value != null && destinationMarker.value != null) {
+        ref.invalidate(directionsProvider);
+      }
     }
-  }
 
-  @override
-  Widget build(BuildContext context) {
     final directionState = ref.watch(
       directionsProvider(
         LatLngPair(
-          origin: origin?.position ?? const LatLng(0, 0),
-          destination: destination?.position ?? const LatLng(0, 0),
+          origin: originMarker.value?.position ?? const LatLng(0, 0),
+          destination: destinationMarker.value?.position ?? const LatLng(0, 0),
         ),
       ),
     );
@@ -111,21 +96,23 @@ class _HomePageState extends ConsumerState<HomePage> {
         children: [
           GoogleMap(
             markers: {
-              if (origin != null) origin!,
-              if (destination != null) destination!,
+              if (originMarker.value != null) originMarker.value!,
+              if (destinationMarker.value != null) destinationMarker.value!,
             },
             polylines: ref.watch(
               routePolylinesProvider(
                 LatLngPair(
-                  origin: origin?.position ?? const LatLng(0, 0),
-                  destination: destination?.position ?? const LatLng(0, 0),
+                  origin: originMarker.value?.position ?? const LatLng(0, 0),
+                  destination:
+                      destinationMarker.value?.position ?? const LatLng(0, 0),
                 ),
               ),
             ),
             myLocationButtonEnabled: false,
             zoomControlsEnabled: false,
             initialCameraPosition: _initialCameraPosition,
-            onMapCreated: (controller) => _googleMapController = controller,
+            onMapCreated:
+                (controller) => googleMapController.value = controller,
           ),
           SafeArea(
             child: Column(
@@ -137,7 +124,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                   onChanged: (input) => fetchPredictions(input, true),
                   onSuggestionSelected:
                       (prediction) => setLocation(prediction, true),
-                  suggestions: fromSuggestions,
+                  suggestions: fromSuggestions.value,
                 ),
                 CustomizedTextField(
                   text: 'Choose destination',
@@ -146,33 +133,41 @@ class _HomePageState extends ConsumerState<HomePage> {
                   onChanged: (input) => fetchPredictions(input, false),
                   onSuggestionSelected:
                       (prediction) => setLocation(prediction, false),
-                  suggestions: toSuggestions,
+                  suggestions: toSuggestions.value,
                 ),
               ],
             ),
           ),
         ],
       ),
-      bottomNavigationBar: _buildBottomNavigationBar(directionState),
+      bottomNavigationBar: Container(
+        height: 60,
+        color: Colors.white,
+        child: directionState.when(
+          data: (data) {
+            if (data == null || data.distance == 0) {
+              return const SizedBox.shrink();
+            }
+            return _buildFareInfo(
+              "${data.distance.toStringAsFixed(2)} km",
+              googleMapController.value,
+              originMarker.value,
+              destinationMarker.value,
+            );
+          },
+          loading: () => LinearProgressIndicator(backgroundColor: Colors.white),
+          error: (err, _) => Text("Error: $err"),
+        ),
+      ),
     );
   }
 
-  Widget _buildBottomNavigationBar(AsyncValue<RouteInfo?> directionState) {
-    return directionState.when(
-      data: (data) {
-        if (data == null || data.distance == 0) {
-          return _buildErrorContainer(
-            "No route found! Please select valid locations.",
-          );
-        }
-        return _buildFareInfo("${data.distance / 1000} km");
-      },
-      loading: () => _buildLoadingContainer(),
-      error: (err, _) => _buildErrorContainer("Error: $err"),
-    );
-  }
-
-  Widget _buildFareInfo(String distance) {
+  Widget _buildFareInfo(
+    String distance,
+    GoogleMapController? controller,
+    Marker? origin,
+    Marker? destination,
+  ) {
     double km = double.tryParse(distance.replaceAll(" km", "")) ?? 0;
     return Container(
       height: 150,
@@ -188,15 +183,17 @@ class _HomePageState extends ConsumerState<HomePage> {
           const SizedBox(height: 8),
           ElevatedButton(
             onPressed: () {
-              _googleMapController?.animateCamera(
-                CameraUpdate.newLatLngBounds(
-                  LatLngBounds(
-                    southwest: origin!.position,
-                    northeast: destination!.position,
+              if (controller != null && origin != null && destination != null) {
+                controller.animateCamera(
+                  CameraUpdate.newLatLngBounds(
+                    LatLngBounds(
+                      southwest: origin.position,
+                      northeast: destination.position,
+                    ),
+                    50,
                   ),
-                  50,
-                ),
-              );
+                );
+              }
             },
             child: const Text("Start Navigation"),
           ),
@@ -212,24 +209,6 @@ class _HomePageState extends ConsumerState<HomePage> {
         Image(image: AssetImage(assetPath), height: 50),
         Text("$vehicle Fare: ₹${fare.toStringAsFixed(2)}"),
       ],
-    );
-  }
-
-  Widget _buildErrorContainer(String message) {
-    return Container(
-      height: 60,
-      color: Colors.redAccent,
-      child: Center(
-        child: Text(message, style: const TextStyle(color: Colors.white)),
-      ),
-    );
-  }
-
-  Widget _buildLoadingContainer() {
-    return Container(
-      height: 60,
-      color: Colors.white,
-      child: const Center(child: CircularProgressIndicator()),
     );
   }
 }

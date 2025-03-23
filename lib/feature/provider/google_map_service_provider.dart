@@ -8,45 +8,58 @@ import 'package:uber_app/feature/homePage/services/google_map_services.dart';
 final googleMapServiceProvider = Provider((ref) => GoogleMapServices());
 
 /// ✅ Place Predictions (Search Suggestions) Provider
-final placePredictionsProvider = FutureProvider.family<List<Prediction>, String>((ref, input) async {
-  return ref.watch(googleMapServiceProvider).getPlacePredictions(input);
-});
+final placePredictionsProvider =
+    FutureProvider.family<List<Prediction>, String>((ref, input) async {
+      return ref.watch(googleMapServiceProvider).getPlacePredictions(input);
+    });
 
 /// ✅ Route & Distance Provider
-final directionsProvider = FutureProvider.family<RouteInfo?, LatLngPair>((ref, pair) async {
-  return ref.watch(googleMapServiceProvider).getDirections(
-    origin: pair.origin,
-    destination: pair.destination,
-  );
+final directionsProvider = FutureProvider.family<RouteInfo?, LatLngPair>((
+  ref,
+  pair,
+) async {
+  return ref
+      .watch(googleMapServiceProvider)
+      .getDirections(origin: pair.origin, destination: pair.destination);
 });
 
 /// ✅ Polyline Provider to Draw Route on Map
-final routePolylinesProvider = Provider.family<Set<Polyline>, LatLngPair>((ref, pair) {
-  final routeAsync = ref.watch(directionsProvider(pair)); // ✅ Pass LatLngPair correctly
+final routePolylinesProvider = Provider.family<Set<Polyline>, LatLngPair>((
+  ref,
+  pair,
+) {
+  final routeAsync = ref.watch(directionsProvider(pair));
   return routeAsync.when(
-    data: (route) => route != null
-        ? {
-            Polyline(
-              polylineId: const PolylineId("route"),
-              color: Colors.blue,
-              width: 5,
-              points: route.polylinePoints
-                  .map((point) => LatLng(point.latitude, point.longitude))
-                  .toList(),
-            ),
-          }
-        : {},
+    data: (route) {
+      if (route != null && route.polylinePoints.isNotEmpty) {
+        return {
+          Polyline(
+            polylineId: const PolylineId("route"),
+            color: Colors.blue,
+            width: 5,
+            points:
+                route.polylinePoints
+                    .map((e) => LatLng(e.latitude, e.longitude))
+                    .toList(),
+          ),
+        };
+      } else {
+        return {};
+      }
+    },
     loading: () => {},
     error: (_, __) => {},
   );
 });
 
 /// ✅ Provider to Get `LatLng` from Place ID
-final placeLatLngProvider = FutureProvider.family<LatLng, String>((ref, placeId) async {
+final placeLatLngProvider = FutureProvider.family<LatLng, String>((
+  ref,
+  placeId,
+) async {
   return ref.watch(googleMapServiceProvider).getLatLngFromPlaceId(placeId);
 });
 
-/// ✅ Class to Hold LatLng Data
 class LatLngPair {
   final LatLng origin;
   final LatLng destination;

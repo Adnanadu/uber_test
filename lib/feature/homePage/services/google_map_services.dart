@@ -1,7 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../model/google_map_model.dart';
-import '../../../env/env.dart';
+import '../../../env/env.dart'; // Ensure you have your API key in an Env class
 
 // Google Map Services Class
 class GoogleMapServices {
@@ -20,11 +20,17 @@ class GoogleMapServices {
       );
 
       if (response.statusCode == 200) {
-        return (response.data["predictions"] as List)
-            .map((e) => Prediction.fromJson(e))
-            .toList();
+        if (response.data["predictions"] != null) {
+          return (response.data["predictions"] as List)
+              .map((e) => Prediction.fromJson(e))
+              .toList();
+        } else {
+          return []; // Return an empty list if no predictions
+        }
       } else {
-        throw Exception("Failed to fetch predictions");
+        throw Exception(
+          "Failed to fetch predictions. Status code: ${response.statusCode}",
+        );
       }
     } catch (e) {
       throw Exception("Error fetching predictions: $e");
@@ -37,8 +43,6 @@ class GoogleMapServices {
     required LatLng destination,
   }) async {
     try {
-      // print("Fetching directions from $origin to $destination..."); // ✅ Debug log
-
       final response = await _dio.get(
         "https://maps.googleapis.com/maps/api/directions/json",
         queryParameters: {
@@ -48,34 +52,36 @@ class GoogleMapServices {
         },
       );
 
-      // print("API Response: ${response.data}"); // ✅ Debug log
-
-      if (response.statusCode == 200 && response.data["routes"].isNotEmpty) {
-        return RouteInfo.fromJson(
-          response.data["routes"][0],
-        ); // ✅ Return parsed object
+      if (response.statusCode == 200) {
+        return RouteInfo.fromJson(response.data);
       } else {
-        // print("Error: No valid routes found!"); // ✅ Debug log
-        return null; // Return null instead of throwing an error
+        throw Exception(
+          "Failed to fetch directions. Status code: ${response.statusCode}",
+        );
       }
     } catch (e) {
-      // print("Error fetching directions: $e"); // ✅ Debug log
-      return null; // Return null instead of crashing the app
+      throw Exception("Error fetching directions: $e");
     }
   }
 
+  /// Get LatLng from Place ID
   Future<LatLng> getLatLngFromPlaceId(String placeId) async {
-    final response = await _dio.get(
-      "https://maps.googleapis.com/maps/api/place/details/json",
-      queryParameters: {"place_id": placeId, "key": Env.apiKey},
-    );
+    try {
+      final response = await _dio.get(
+        "https://maps.googleapis.com/maps/api/place/details/json",
+        queryParameters: {"place_id": placeId, "key": Env.apiKey},
+      );
 
-    if (response.statusCode == 200 && response.data["result"] != null) {
-      final location = response.data["result"]["geometry"]["location"];
-      return LatLng(location["lat"], location["lng"]);
+      if (response.statusCode == 200 && response.data["result"] != null) {
+        final location = response.data["result"]["geometry"]["location"];
+        return LatLng(location["lat"], location["lng"]);
+      } else {
+        throw Exception(
+          "Failed to fetch coordinates. Status code: ${response.statusCode}",
+        );
+      }
+    } catch (e) {
+      throw Exception("Error fetching coordinates: $e");
     }
-
-    throw Exception("Failed to fetch coordinates");
   }
-  
 }

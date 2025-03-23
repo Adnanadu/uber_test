@@ -1,5 +1,4 @@
 import 'dart:convert';
-
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 // Function to parse JSON data
@@ -59,32 +58,40 @@ class Prediction {
   };
 }
 
-// Route Info Model (for distance and duration)
-
+// Route Info Model (for distance, duration, and polyline)
 class RouteInfo {
   final double distance;
   final double duration;
-  final List<LatLng> polylinePoints; // ✅ Add this!
+  final List<LatLng> polylinePoints;
 
   RouteInfo({
     required this.distance,
     required this.duration,
-    required this.polylinePoints, // ✅ Add this!
+    required this.polylinePoints,
   });
+
+  factory RouteInfo.fromJson(Map<String, dynamic> json) {
+    if (json["routes"] == null || json["routes"].isEmpty) {
+      return RouteInfo(distance: 0, duration: 0, polylinePoints: []);
+    }
+
+    return RouteInfo(
+      distance: json["routes"][0]["legs"][0]["distance"]["value"] / 1000.0,
+      duration: json["routes"][0]["legs"][0]["duration"]["value"] / 60.0,
+      polylinePoints: _decodePolyline(
+        json["routes"][0]["overview_polyline"]["points"],
+      ),
+    );
+  }
 
   Map<String, dynamic> toJson() => {
     "distance": distance,
     "duration": duration,
-    "polylinePoints": polylinePoints.map((point) => {"lat": point.latitude, "lng": point.longitude}).toList(),
+    "polylinePoints":
+        polylinePoints
+            .map((point) => {"lat": point.latitude, "lng": point.longitude})
+            .toList(),
   };
-
-  factory RouteInfo.fromJson(Map<String, dynamic> json) {
-    return RouteInfo(
-      distance: json["routes"][0]["legs"][0]["distance"]["value"] / 1000.0,
-      duration: json["routes"][0]["legs"][0]["duration"]["value"] / 60.0,
-      polylinePoints: _decodePolyline(json["routes"][0]["overview_polyline"]["points"]), // ✅ Extract polyline points
-    );
-  }
 
   static List<LatLng> _decodePolyline(String encoded) {
     List<LatLng> polylineCoordinates = [];
@@ -117,31 +124,4 @@ class RouteInfo {
 
     return polylineCoordinates;
   }
-}
-
-
-// Distance Model (km details
-class Distance {
-  final String text;
-  final int value; // meters
-
-  Distance({required this.text, required this.value});
-
-  factory Distance.fromJson(Map<String, dynamic> json) =>
-      Distance(text: json["text"], value: json["value"]);
-
-  Map<String, dynamic> toJson() => {"text": text, "value": value};
-}
-
-// Duration Model (time details)
-class DurationInfo {
-  final String text;
-  final int value; // seconds
-
-  DurationInfo({required this.text, required this.value});
-
-  factory DurationInfo.fromJson(Map<String, dynamic> json) =>
-      DurationInfo(text: json["text"], value: json["value"]);
-
-  Map<String, dynamic> toJson() => {"text": text, "value": value};
 }
