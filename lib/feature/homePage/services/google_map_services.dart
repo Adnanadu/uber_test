@@ -38,6 +38,8 @@ class GoogleMapServices {
   }
 
   /// Get Directions & Distance
+
+  /// Get Directions & Distance
   Future<RouteInfo?> getDirections({
     required LatLng origin,
     required LatLng destination,
@@ -53,7 +55,7 @@ class GoogleMapServices {
       );
 
       if (response.statusCode == 200) {
-        return RouteInfo.fromJson(response.data);
+        return RouteInfo.fromJson(response.data["routes"][0]);
       } else {
         throw Exception(
           "Failed to fetch directions. Status code: ${response.statusCode}",

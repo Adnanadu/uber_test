@@ -1,6 +1,7 @@
 
 /lib/core/secret/
 *.env
+*.g.dart
 # Miscellaneous
 *.class
 *.log

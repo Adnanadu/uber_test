@@ -3,7 +3,7 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:uber_app/feature/homePage/model/google_map_model.dart';
-import 'package:uber_app/feature/provider/google_map_service_provider.dart';
+import 'package:uber_app/feature/homePage/provider/google_map_service_provider.dart';
 import '../widgets/customized_text_field.dart';
 
 class HomePage extends HookConsumerWidget {
@@ -140,6 +140,7 @@ class HomePage extends HookConsumerWidget {
           ),
         ],
       ),
+
       // bottomNavigationBar: _buildBottomNavigationBar(
       //   directionState,
       //   googleMapController.value,
@@ -163,7 +164,13 @@ class HomePage extends HookConsumerWidget {
               destinationMarker.value,
             );
           },
-          loading: () => LinearProgressIndicator(),
+          loading: () {
+            if (originMarker.value == null || destinationMarker.value == null) {
+              return _buildErrorContainer("Please select both locations.");
+            }
+            return Center(child: CircularProgressIndicator());
+          },
+
           error: (err, _) => _buildErrorContainer("Error: $err"),
         ),
       ),
@@ -223,7 +230,7 @@ class HomePage extends HookConsumerWidget {
   Widget _buildErrorContainer(String message) {
     return Container(
       height: 60,
-      color: Colors.redAccent,
+      color: Colors.blueAccent,
       child: Center(
         child: Text(message, style: const TextStyle(color: Colors.white)),
       ),
