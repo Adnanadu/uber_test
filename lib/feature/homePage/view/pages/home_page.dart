@@ -19,8 +19,8 @@ class _HomePageState extends ConsumerState<HomePage> {
   final TextEditingController fromController = TextEditingController();
   final TextEditingController toController = TextEditingController();
 
-  List<String> fromSuggestions = [];
-  List<String> toSuggestions = [];
+  List<Prediction> fromSuggestions = [];
+  List<Prediction> toSuggestions = [];
 
   static const CameraPosition _initialCameraPosition = CameraPosition(
     target: LatLng(11.441197, 75.694731),
@@ -37,7 +37,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   void fetchPredictions(String input, bool isFrom) async {
     if (input.isEmpty) {
       setState(() {
-        isFrom ? fromSuggestions.clear() : toSuggestions.clear();
+        isFrom ? fromSuggestions = [] : toSuggestions = [];
       });
       return;
     }
@@ -45,48 +45,50 @@ class _HomePageState extends ConsumerState<HomePage> {
     final predictions = await ref.read(placePredictionsProvider(input).future);
     setState(() {
       if (isFrom) {
-        fromSuggestions = predictions.map((e) => e.description).toList();
+        fromSuggestions = predictions;
       } else {
-        toSuggestions = predictions.map((e) => e.description).toList();
+        toSuggestions = predictions;
       }
     });
   }
 
   /// Set marker when user selects a prediction
-  void setLocation(String location, bool isFrom) {
+  void setLocation(Prediction prediction, bool isFrom) async {
     if (isFrom) {
-      fromController.text = location;
+      fromController.text = prediction.description;
       fromSuggestions.clear();
     } else {
-      toController.text = location;
+      toController.text = prediction.description;
       toSuggestions.clear();
     }
 
-    ref.invalidate(directionsProvider);
-  }
+    final placeLatLng = await ref.read(
+      placeLatLngProvider(prediction.placeId).future,
+    );
 
-  /// Add marker to the map
-  void addMarker(LatLng pos) {
     setState(() {
-      if (destination != null) {
+      if (isFrom) {
         origin = Marker(
           markerId: const MarkerId("origin"),
-          infoWindow: const InfoWindow(title: "Origin"),
+          position: placeLatLng,
+          infoWindow: const InfoWindow(title: "Pickup Location"),
           icon: BitmapDescriptor.defaultMarkerWithHue(
             BitmapDescriptor.hueGreen,
           ),
-          position: pos,
         );
-        destination = null;
       } else {
         destination = Marker(
           markerId: const MarkerId("destination"),
+          position: placeLatLng,
           infoWindow: const InfoWindow(title: "Destination"),
           icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
-          position: pos,
         );
       }
     });
+
+    _googleMapController?.animateCamera(
+      CameraUpdate.newLatLngZoom(placeLatLng, 14),
+    );
 
     if (origin != null && destination != null) {
       ref.invalidate(directionsProvider);
@@ -112,7 +114,14 @@ class _HomePageState extends ConsumerState<HomePage> {
               if (origin != null) origin!,
               if (destination != null) destination!,
             },
-            onLongPress: addMarker,
+            polylines: ref.watch(
+              routePolylinesProvider(
+                LatLngPair(
+                  origin: origin?.position ?? const LatLng(0, 0),
+                  destination: destination?.position ?? const LatLng(0, 0),
+                ),
+              ),
+            ),
             myLocationButtonEnabled: false,
             zoomControlsEnabled: false,
             initialCameraPosition: _initialCameraPosition,
@@ -127,7 +136,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                   padding: const EdgeInsets.all(16.0),
                   onChanged: (input) => fetchPredictions(input, true),
                   onSuggestionSelected:
-                      (selection) => setLocation(selection, true),
+                      (prediction) => setLocation(prediction, true),
                   suggestions: fromSuggestions,
                 ),
                 CustomizedTextField(
@@ -136,7 +145,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                   padding: const EdgeInsets.symmetric(horizontal: 16.0),
                   onChanged: (input) => fetchPredictions(input, false),
                   onSuggestionSelected:
-                      (selection) => setLocation(selection, false),
+                      (prediction) => setLocation(prediction, false),
                   suggestions: toSuggestions,
                 ),
               ],
@@ -148,15 +157,16 @@ class _HomePageState extends ConsumerState<HomePage> {
     );
   }
 
-  Widget _buildBottomNavigationBar(AsyncValue<RouteInfo> directionState) {
+  Widget _buildBottomNavigationBar(AsyncValue<RouteInfo?> directionState) {
     return directionState.when(
-      data:
-          (data) =>
-              data.distance.value == 0
-                  ? _buildErrorContainer(
-                    "No route found! Please select valid locations.",
-                  )
-                  : _buildFareInfo(data.distance.text),
+      data: (data) {
+        if (data == null || data.distance == 0) {
+          return _buildErrorContainer(
+            "No route found! Please select valid locations.",
+          );
+        }
+        return _buildFareInfo("${data.distance / 1000} km");
+      },
       loading: () => _buildLoadingContainer(),
       error: (err, _) => _buildErrorContainer("Error: $err"),
     );
@@ -166,12 +176,30 @@ class _HomePageState extends ConsumerState<HomePage> {
     double km = double.tryParse(distance.replaceAll(" km", "")) ?? 0;
     return Container(
       height: 150,
-      color: Colors.white38,
+      color: Colors.white,
       child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Text("Total Distance: $distance"),
+          const SizedBox(height: 8),
           _buildFareRow("Car", "assets/icons/car.png", km * 10),
+          const SizedBox(height: 8),
           _buildFareRow("Bike", "assets/icons/motorcycle.png", km * 5),
+          const SizedBox(height: 8),
+          ElevatedButton(
+            onPressed: () {
+              _googleMapController?.animateCamera(
+                CameraUpdate.newLatLngBounds(
+                  LatLngBounds(
+                    southwest: origin!.position,
+                    northeast: destination!.position,
+                  ),
+                  50,
+                ),
+              );
+            },
+            child: const Text("Start Navigation"),
+          ),
         ],
       ),
     );
@@ -182,8 +210,7 @@ class _HomePageState extends ConsumerState<HomePage> {
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
         Image(image: AssetImage(assetPath), height: 50),
-        Text("$vehicle Fare: ₹$fare"),
-        TextButton(onPressed: () {}, child: Text("Ride with $vehicle")),
+        Text("$vehicle Fare: ₹${fare.toStringAsFixed(2)}"),
       ],
     );
   }
@@ -202,7 +229,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     return Container(
       height: 60,
       color: Colors.white,
-      child: const Center(child: Text("Loading route... ⏳")),
+      child: const Center(child: CircularProgressIndicator()),
     );
   }
 }

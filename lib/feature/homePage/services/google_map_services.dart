@@ -7,32 +7,6 @@ import '../../../env/env.dart';
 class GoogleMapServices {
   final Dio _dio = Dio();
 
-  /// Get LatLng from a Place ID
-Future<LatLng> getLatLngFromPlaceId(String placeId) async {
-  try {
-    final response = await _dio.get(
-      "https://maps.googleapis.com/maps/api/place/details/json",
-      queryParameters: {
-        "place_id": placeId,
-        "key": Env.apiKey,
-      },
-    );
-
-    if (response.statusCode == 200 &&
-        response.data["result"] != null &&
-        response.data["result"]["geometry"] != null) {
-      final location = response.data["result"]["geometry"]["location"];
-      return LatLng(location["lat"], location["lng"]);
-    } else {
-      throw Exception("Failed to fetch place details");
-    }
-  } catch (e) {
-    print("Error fetching place details: $e");
-    throw Exception("Error fetching place details: $e");
-  }
-}
-
-
   /// Get Place Predictions
   Future<List<Prediction>> getPlacePredictions(String input) async {
     try {
@@ -89,4 +63,19 @@ Future<LatLng> getLatLngFromPlaceId(String placeId) async {
       return null; // Return null instead of crashing the app
     }
   }
+
+  Future<LatLng> getLatLngFromPlaceId(String placeId) async {
+    final response = await _dio.get(
+      "https://maps.googleapis.com/maps/api/place/details/json",
+      queryParameters: {"place_id": placeId, "key": Env.apiKey},
+    );
+
+    if (response.statusCode == 200 && response.data["result"] != null) {
+      final location = response.data["result"]["geometry"]["location"];
+      return LatLng(location["lat"], location["lng"]);
+    }
+
+    throw Exception("Failed to fetch coordinates");
+  }
+  
 }

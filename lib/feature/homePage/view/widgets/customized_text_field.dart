@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:uber_app/feature/homePage/model/google_map_model.dart';
 
 class CustomizedTextField extends StatelessWidget {
   final String text;
   final TextEditingController controller;
   final EdgeInsetsGeometry padding;
-  final Function(String) onChanged; // ✅ New: Trigger API call when typing
-  final Function(String) onSuggestionSelected; // ✅ New: Handle selection
-  final List<String> suggestions; // ✅ New: Pass fetched predictions
+  final Function(String) onChanged;
+  final Function(Prediction) onSuggestionSelected; // ✅ Accepts `Prediction`
+  final List<Prediction> suggestions; // ✅ Stores `Prediction` objects
 
   const CustomizedTextField({
     super.key,
@@ -32,20 +33,26 @@ class CustomizedTextField extends StatelessWidget {
               filled: true,
               suffixIcon: const Icon(Icons.search),
             ),
-            onChanged: onChanged, 
+            onChanged: onChanged,
           ),
-          if (suggestions.isNotEmpty) 
+          if (suggestions.isNotEmpty)
             Container(
               color: Colors.white,
               child: Column(
-                children: suggestions
-                    .map(
-                      (suggestion) => ListTile(
-                        title: Text(suggestion),
-                        onTap: () => onSuggestionSelected(suggestion),
-                      ),
-                    )
-                    .toList(),
+                children:
+                    suggestions
+                        .map(
+                          (prediction) => ListTile(
+                            title: Text(
+                              prediction.description,
+                            ), // ✅ Show place name
+                            onTap:
+                                () => onSuggestionSelected(
+                                  prediction,
+                                ), // ✅ Ensure correct type
+                          ),
+                        )
+                        .toList(),
               ),
             ),
         ],

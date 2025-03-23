@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+
 // Function to parse JSON data
 GoogleMapModel googleMapModelFromJson(String str) =>
     GoogleMapModel.fromJson(json.decode(str));
@@ -58,22 +60,65 @@ class Prediction {
 }
 
 // Route Info Model (for distance and duration)
+
 class RouteInfo {
-  final Distance distance;
-  final DurationInfo duration;
+  final double distance;
+  final double duration;
+  final List<LatLng> polylinePoints; // ✅ Add this!
 
-  RouteInfo({required this.distance, required this.duration});
-
-  factory RouteInfo.fromJson(Map<String, dynamic> json) => RouteInfo(
-    distance: Distance.fromJson(json["legs"][0]["distance"]),
-    duration: DurationInfo.fromJson(json["legs"][0]["duration"]),
-  );
+  RouteInfo({
+    required this.distance,
+    required this.duration,
+    required this.polylinePoints, // ✅ Add this!
+  });
 
   Map<String, dynamic> toJson() => {
-    "distance": distance.toJson(),
-    "duration": duration.toJson(),
+    "distance": distance,
+    "duration": duration,
+    "polylinePoints": polylinePoints.map((point) => {"lat": point.latitude, "lng": point.longitude}).toList(),
   };
+
+  factory RouteInfo.fromJson(Map<String, dynamic> json) {
+    return RouteInfo(
+      distance: json["routes"][0]["legs"][0]["distance"]["value"] / 1000.0,
+      duration: json["routes"][0]["legs"][0]["duration"]["value"] / 60.0,
+      polylinePoints: _decodePolyline(json["routes"][0]["overview_polyline"]["points"]), // ✅ Extract polyline points
+    );
+  }
+
+  static List<LatLng> _decodePolyline(String encoded) {
+    List<LatLng> polylineCoordinates = [];
+    int index = 0, len = encoded.length;
+    int lat = 0, lng = 0;
+
+    while (index < len) {
+      int shift = 0, result = 0;
+      int b;
+      do {
+        b = encoded.codeUnitAt(index++) - 63;
+        result |= (b & 0x1F) << shift;
+        shift += 5;
+      } while (b >= 0x20);
+      int dlat = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
+      lat += dlat;
+
+      shift = 0;
+      result = 0;
+      do {
+        b = encoded.codeUnitAt(index++) - 63;
+        result |= (b & 0x1F) << shift;
+        shift += 5;
+      } while (b >= 0x20);
+      int dlng = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
+      lng += dlng;
+
+      polylineCoordinates.add(LatLng(lat / 1E5, lng / 1E5));
+    }
+
+    return polylineCoordinates;
+  }
 }
+
 
 // Distance Model (km details
 class Distance {

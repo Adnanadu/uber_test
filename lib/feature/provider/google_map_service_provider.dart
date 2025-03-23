@@ -1,50 +1,54 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:uber_app/feature/homePage/model/google_map_model.dart';
 import 'package:uber_app/feature/homePage/services/google_map_services.dart';
 
-// Provider for Google Map Services
+/// ✅ Google Map Services Provider
 final googleMapServiceProvider = Provider((ref) => GoogleMapServices());
 
-// Provider for Place Predictions (Search Suggestions)
-final placePredictionsProvider =
-    FutureProvider.family<List<Prediction>, String>((ref, input) async {
-      final service = ref.watch(googleMapServiceProvider);
-      return service.getPlacePredictions(input);
-    });
+/// ✅ Place Predictions (Search Suggestions) Provider
+final placePredictionsProvider = FutureProvider.family<List<Prediction>, String>((ref, input) async {
+  return ref.watch(googleMapServiceProvider).getPlacePredictions(input);
+});
 
-// Provider for Distance & Route Info
-final directionsProvider = FutureProvider.family<RouteInfo, LatLngPair>((
-  ref,
-  pair,
-) async {
-  final service = ref.watch(googleMapServiceProvider);
-  final routeInfo = await service.getDirections(
+/// ✅ Route & Distance Provider
+final directionsProvider = FutureProvider.family<RouteInfo?, LatLngPair>((ref, pair) async {
+  return ref.watch(googleMapServiceProvider).getDirections(
     origin: pair.origin,
     destination: pair.destination,
   );
-
-  if (routeInfo == null) {
-    // print("⚠️ No valid route found! Returning default.");
-    return RouteInfo(
-      distance: Distance(text: "0 km", value: 0),
-      duration: DurationInfo(text: "0 min", value: 0),
-    ); // ✅ Return default object instead of null
-  }
-  return routeInfo;
 });
 
-// Class to Hold LatLng Data
+/// ✅ Polyline Provider to Draw Route on Map
+final routePolylinesProvider = Provider.family<Set<Polyline>, LatLngPair>((ref, pair) {
+  final routeAsync = ref.watch(directionsProvider(pair)); // ✅ Pass LatLngPair correctly
+  return routeAsync.when(
+    data: (route) => route != null
+        ? {
+            Polyline(
+              polylineId: const PolylineId("route"),
+              color: Colors.blue,
+              width: 5,
+              points: route.polylinePoints
+                  .map((point) => LatLng(point.latitude, point.longitude))
+                  .toList(),
+            ),
+          }
+        : {},
+    loading: () => {},
+    error: (_, __) => {},
+  );
+});
+
+/// ✅ Provider to Get `LatLng` from Place ID
+final placeLatLngProvider = FutureProvider.family<LatLng, String>((ref, placeId) async {
+  return ref.watch(googleMapServiceProvider).getLatLngFromPlaceId(placeId);
+});
+
+/// ✅ Class to Hold LatLng Data
 class LatLngPair {
   final LatLng origin;
   final LatLng destination;
   LatLngPair({required this.origin, required this.destination});
 }
-
-final placeLatLngProvider = FutureProvider.family<LatLng, String>((
-  ref,
-  placeId,
-) async {
-  final service = ref.watch(googleMapServiceProvider);
-  return service.getLatLngFromPlaceId(placeId);
-});
