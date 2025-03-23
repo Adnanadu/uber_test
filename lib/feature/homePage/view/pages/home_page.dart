@@ -140,13 +140,21 @@ class HomePage extends HookConsumerWidget {
           ),
         ],
       ),
+      // bottomNavigationBar: _buildBottomNavigationBar(
+      //   directionState,
+      //   googleMapController.value,
+      //   originMarker.value,
+      //   destinationMarker.value,
+      // ),
       bottomNavigationBar: Container(
         height: 60,
         color: Colors.white,
         child: directionState.when(
           data: (data) {
             if (data == null || data.distance == 0) {
-              return const SizedBox.shrink();
+              return _buildErrorContainer(
+                "No route found! Please select valid locations.",
+              );
             }
             return _buildFareInfo(
               "${data.distance.toStringAsFixed(2)} km",
@@ -155,8 +163,8 @@ class HomePage extends HookConsumerWidget {
               destinationMarker.value,
             );
           },
-          loading: () => LinearProgressIndicator(backgroundColor: Colors.white),
-          error: (err, _) => Text("Error: $err"),
+          loading: () => LinearProgressIndicator(),
+          error: (err, _) => _buildErrorContainer("Error: $err"),
         ),
       ),
     );
@@ -209,6 +217,16 @@ class HomePage extends HookConsumerWidget {
         Image(image: AssetImage(assetPath), height: 50),
         Text("$vehicle Fare: ₹${fare.toStringAsFixed(2)}"),
       ],
+    );
+  }
+
+  Widget _buildErrorContainer(String message) {
+    return Container(
+      height: 60,
+      color: Colors.redAccent,
+      child: Center(
+        child: Text(message, style: const TextStyle(color: Colors.white)),
+      ),
     );
   }
 }

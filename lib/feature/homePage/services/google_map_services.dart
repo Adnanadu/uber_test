@@ -1,7 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import '../model/google_map_model.dart';
-import '../../../env/env.dart'; // Ensure you have your API key in an Env class
+import 'package:uber_app/env/env.dart';
+import 'package:uber_app/feature/homePage/model/google_map_model.dart';
 
 // Google Map Services Class
 class GoogleMapServices {
