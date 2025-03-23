@@ -115,27 +115,29 @@ class HomePage extends HookConsumerWidget {
                 (controller) => googleMapController.value = controller,
           ),
           SafeArea(
-            child: Column(
-              children: [
-                CustomizedTextField(
-                  text: 'Search starting location',
-                  controller: fromController,
-                  padding: const EdgeInsets.all(16.0),
-                  onChanged: (input) => fetchPredictions(input, true),
-                  onSuggestionSelected:
-                      (prediction) => setLocation(prediction, true),
-                  suggestions: fromSuggestions.value,
-                ),
-                CustomizedTextField(
-                  text: 'Choose destination',
-                  controller: toController,
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  onChanged: (input) => fetchPredictions(input, false),
-                  onSuggestionSelected:
-                      (prediction) => setLocation(prediction, false),
-                  suggestions: toSuggestions.value,
-                ),
-              ],
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  CustomizedTextField(
+                    text: 'Search starting location',
+                    controller: fromController,
+                    padding: const EdgeInsets.all(16.0),
+                    onChanged: (input) => fetchPredictions(input, true),
+                    onSuggestionSelected:
+                        (prediction) => setLocation(prediction, true),
+                    suggestions: fromSuggestions.value,
+                  ),
+                  CustomizedTextField(
+                    text: 'Choose destination',
+                    controller: toController,
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    onChanged: (input) => fetchPredictions(input, false),
+                    onSuggestionSelected:
+                        (prediction) => setLocation(prediction, false),
+                    suggestions: toSuggestions.value,
+                  ),
+                ],
+              ),
             ),
           ),
         ],
