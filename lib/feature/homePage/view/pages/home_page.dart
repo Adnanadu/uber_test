@@ -39,6 +39,36 @@ class _HomePageState extends State<HomePage> {
     tilt: 59.440717697143555,
     zoom: 14.151926040649414,
   );
+  Marker? origin;
+  Marker? destination;
+
+  void addMarker(LatLng pos) {
+    if ((destination != null)) {
+      setState(() {
+        origin = Marker(
+          markerId: const MarkerId("origin"),
+          infoWindow: const InfoWindow(title: "Origin"),
+          icon: BitmapDescriptor.defaultMarkerWithHue(
+            BitmapDescriptor.hueGreen,
+          ),
+          position: pos,
+        );
+        destination = null;
+      });
+    } else {
+      setState(() {
+        destination = Marker(
+          markerId: const MarkerId("destination"),
+          infoWindow: const InfoWindow(title: "Destination"),
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+          position: pos,
+        );
+      });
+    }
+  }
+
+  /// Text controllers for the initial location and destination location.
+
   final TextEditingController intialTextController = TextEditingController();
   final TextEditingController destinationTextController =
       TextEditingController();
@@ -57,8 +87,10 @@ class _HomePageState extends State<HomePage> {
     return Scaffold(
       body: Stack(
         children: [
+          /// Google Map
           GoogleMap(
             markers: const <Marker>{},
+            onLongPress: addMarker,
             myLocationButtonEnabled: false,
             zoomControlsEnabled: false,
             initialCameraPosition: _initialCameraPosition,
@@ -66,6 +98,8 @@ class _HomePageState extends State<HomePage> {
                 (GoogleMapController controller) =>
                     _googleMapController = controller,
           ),
+
+          /// intial location and destination location text fields
           SafeArea(
             child: Column(
               children: [
@@ -144,7 +178,7 @@ class _HomePageState extends State<HomePage> {
                   ],
                 ),
               )
-              : const SizedBox.shrink(),
+              : null,
     );
   }
 }
